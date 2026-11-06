@@ -422,7 +422,7 @@
             return;
         }
 
-        const companyCode = document.getElementById('api-company-code').value.trim() || 'Lkqt';
+        const companyCode = document.getElementById('api-company-code').value.trim() || 'Cty';
         const partnerHeaderTitle = cat.isPurchase ? 'Người bán' : 'Người mua';
 
         const wsData = [
