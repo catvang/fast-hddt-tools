@@ -1,0 +1,304 @@
+/* Panel Điều khiển góc trái dưới */
+#api-hddt-panel {
+    position: fixed;
+    bottom: 25px;
+    left: 25px;
+    width: 345px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    border: 1px solid #cbd5e1;
+    padding: 14px 16px;
+    z-index: 999998;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    user-select: none;
+}
+.a-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+.a-input-code {
+    width: 110px;
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-weight: bold;
+    color: #0284c7;
+}
+.a-grid-q {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 6px;
+}
+.a-btn-q {
+    padding: 5px 0;
+    border: 1px solid #93c5fd;
+    background: #eff6ff;
+    color: #0284c7;
+    border-radius: 4px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+}
+.a-btn-q:hover {
+    background: #0284c7;
+    color: #fff;
+}
+.a-grid-m {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 3px;
+    margin: 6px 0 8px 0;
+}
+.a-btn-m {
+    padding: 5px 0;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 11px;
+}
+.a-btn-m:hover {
+    background: #0284c7;
+    color: #fff;
+    border-color: #0284c7;
+}
+
+/* Khung Checkbox 2 cột */
+.cb-container {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+}
+.cb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+}
+.cb-columns {
+    display: flex;
+    gap: 10px;
+}
+.cb-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cb-col-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0369a1;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+.cb-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    cursor: pointer;
+    color: #334155;
+}
+.cb-item input {
+    cursor: pointer;
+    margin: 0;
+}
+
+/* Modal cố định kích thước khi đổi Tab */
+#api-hddt-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 96vw;
+    max-width: 1550px;
+    height: 88vh;
+    min-height: 88vh;
+    max-height: 88vh;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.35);
+    z-index: 999999;
+    padding: 16px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+#api-hddt-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.45);
+    z-index: 999998;
+}
+.modal-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-top: 8px;
+    flex-shrink: 0;
+}
+.tab-btn {
+    padding: 8px 14px;
+    border: none;
+    background: #f1f5f9;
+    cursor: pointer;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    position: relative;
+    bottom: -2px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.tab-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.tab-btn.active {
+    background: #ffffff;
+    color: #0284c7;
+    border-top: 2px solid #0284c7;
+    border-left: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 2px solid #ffffff;
+    font-weight: 700;
+}
+.tab-badge {
+    background: #cbd5e1;
+    color: #1e293b;
+    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+}
+.tab-btn.active .tab-badge {
+    background: #0284c7;
+    color: #ffffff;
+}
+
+.modal-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.modal-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.input-mst-filter {
+    width: 120px;
+    padding: 4px 8px;
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    font-weight: 700;
+    color: #0369a1;
+    font-size: 12px;
+    outline: none;
+}
+.badge-count {
+    font-weight: 700;
+    color: #059669;
+    background: #ecfdf5;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid #a7f3d0;
+    font-size: 11px;
+}
+.modal-tbl-wrap {
+    overflow-x: auto;
+    overflow-y: scroll;
+    flex: 1;
+    margin: 10px 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+.modal-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.modal-tbl th, .modal-tbl td {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 6px 8px;
+    text-align: left;
+}
+.modal-tbl th {
+    background: #f8fafc;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.row-warning-modified { background-color: #fef9c3 !important; }
+.row-danger-replaced { background-color: #fee2e2 !important; color: #991b1b !important; }
+
+.btn-download-xml {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    padding: 3px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+}
+.btn-download-xml:hover { background: #0369a1; }
+.btn-download-xml:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-top-download {
+    background: #0284c7;
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-top-download:hover { background: #0369a1; }
+.btn-excel-tab {
+    background: #047857;
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-excel-tab:hover { background: #065f46; }
