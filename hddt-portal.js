@@ -66,6 +66,7 @@
     const pad = (n) => String(n).padStart(2, '0');
     const fmtDateParam = (d, isEnd) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}T${isEnd ? '23:59:59' : '00:00:00'}`;
     const fmtMoney = (val) => (val !== null && val !== undefined && val !== '') ? Number(val).toLocaleString('vi-VN') : '0';
+    const normalizeCode = (s) => String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
     const CATEGORIES = [
         { key: 'mv_cm', label: 'Mua vào - Có mã', isPurchase: true, loaiHD: 'co_ma', tag: 'Mua CMa' },
@@ -157,67 +158,81 @@
         });
     }
 
-    // 3. Xử lý XML & Đọc cấu trúc HĐ liên quan
-    async function extractXmlTextFromZip(zipBuffer) {
-        const zip = await JSZip.loadAsync(zipBuffer);
-        let xmlFile = zip.file("invoice.xml");
-        if (!xmlFile) {
-            const xmlFiles = zip.file(/\.xml$/i);
-            if (xmlFiles.length > 0) xmlFile = xmlFiles[0];
+    // 3. TẢI VÀ BÓC TÁCH QUA REST API: /invoices/relative VÀ /invoices/detail
+    // 3. TRA CỨU REST API: /invoices/relative VÀ /invoices/detail
+    // Chuyển đổi tdlap ISO string thành định dạng dd/mm/yyyy
+    function fmtIsoToDateStr(isoStr) {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        } catch (e) {
+            return '';
         }
-        if (!xmlFile) return null;
-        return await xmlFile.async("string");
     }
 
-    async function fetchRelatedInfoFromXml(item, isSco) {
+    async function fetchInvoiceRelativeAndDetail(item, isSco) {
         const token = getJwtToken();
         const baseEndpoint = isSco ? 'sco-query' : 'query';
-        const url = `https://hoadondientu.gdt.gov.vn/api/${baseEndpoint}/invoices/export-xml?nbmst=${item.nbmst}&khhdon=${encodeURIComponent(item.khhdon)}&shdon=${item.shdon}&khmshdon=${item.khmshdon}`;
+        const cleanShd = parseInt(item.shdon, 10);
+        const khhd = (item.khhdon || '').replace(/^[0-9]/, '');
+        const khms = item.khmshdon || '1';
 
         try {
-            const res = await fetch(url, {
+            const relUrl = `https://hoadondientu.gdt.gov.vn/api/${baseEndpoint}/invoices/relative?nbmst=${item.nbmst}&khmshdon=${khms}&khhdon=${encodeURIComponent(khhd)}&shdon=${cleanShd}`;
+            
+            const relRes = await fetch(relUrl, {
                 method: 'GET',
                 credentials: 'include',
                 headers: {
                     'Accept': 'application/json, text/plain, */*',
-                    'Accept-Language': 'vi',
                     'Authorization': `Bearer ${token}`,
                     'End-Point': '/tra-cuu/tra-cuu-hoa-don',
                     'Request-Id': generateUUID()
                 }
             });
 
-            if (!res.ok) return null;
-            const arrayBuffer = await res.arrayBuffer();
-            const xmlStr = await extractXmlTextFromZip(arrayBuffer);
-            if (!xmlStr) return null;
+            if (!relRes.ok) return null;
 
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlStr, "text/xml");
-            const nodeLQuan = xmlDoc.querySelector("TTHDLQuan") || xmlDoc.querySelector("tthdlquan");
+            const rawJson = await relRes.json();
+            if (!rawJson) return null;
+            const relData = Array.isArray(rawJson) ? rawJson[0] : rawJson;
+            if (!relData) return null;
 
-            if (nodeLQuan) {
-                const shdGoc = (nodeLQuan.querySelector("SHDGoc, shdgoc")?.textContent || '').trim();
-                const khhdGoc = (nodeLQuan.querySelector("KHHDGoc, khhdgoc")?.textContent || '').trim();
-                const nlapGoc = (nodeLQuan.querySelector("NLapHDGoc, nlaphdgoc")?.textContent || '').trim();
-                const gchu = (nodeLQuan.querySelector("GChu, gchu")?.textContent || '').trim();
+            // Xử lý linh hoạt 2 chiều:
+            let shdMoi = null;
+            let khhdMoi = relData.khhdon || null;
+            let shdGoc = null;
+            let khhdGoc = relData.khhdgoc || null;
+            const ngayLapLQuan = fmtIsoToDateStr(relData.tdlap);
 
-                let desc = '';
-                if (shdGoc) desc += `Số HĐ gốc: ${shdGoc}`;
-                if (khhdGoc) desc += ` (${khhdGoc})`;
-                if (nlapGoc) desc += ` ngày ${nlapGoc}`;
-                if (gchu) desc += ` - ${gchu}`;
-
-                return {
-                    shdGoc: shdGoc,
-                    khhdGoc: khhdGoc,
-                    nlapGoc: nlapGoc,
-                    gchu: gchu,
-                    fullDesc: desc || null
-                };
+            // TH 1: Đứng ở HĐ gốc -> relData.shdgoc = 62422, relData.shdon = 62428
+            if (relData.shdgoc && parseInt(relData.shdgoc, 10) === cleanShd) {
+                shdGoc = cleanShd;
+                shdMoi = parseInt(relData.shdon, 10);
+            } 
+            // TH 2: Đứng ở HĐ điều chỉnh -> relData.shdgoc = null, relData.shdon = 62422 (HĐ gốc)
+            else if (!relData.shdgoc && relData.shdon && parseInt(relData.shdon, 10) !== cleanShd) {
+                shdGoc = parseInt(relData.shdon, 10);
+                shdMoi = cleanShd;
             }
+            // TH 3: Trường hợp còn lại
+            else {
+                shdMoi = relData.shdon ? parseInt(relData.shdon, 10) : null;
+                shdGoc = relData.shdgoc ? parseInt(relData.shdgoc, 10) : null;
+            }
+
+            return {
+                shdonMoi: shdMoi,
+                khhdonMoi: khhdMoi,
+                shdgoc: shdGoc,
+                khhdgoc: khhdGoc,
+                ngayLapLQuan: ngayLapLQuan
+            };
+
         } catch (e) {
-            console.warn(`Không đọc được XML HĐ số ${item.shdon}:`, e);
+            console.warn(`[HDDT] Lỗi API relative cho HĐ ${item.shdon}:`, e);
         }
         return null;
     }
@@ -253,8 +268,7 @@
         a.remove();
     }
 
-    // 4. Lấy Buffer Excel từ máy chủ CQT (chỉ lấy buffer để xử lý, không lưu file thô nếu chọn tải file tùy chỉnh)
-    // 4. Tải file Excel trực tiếp từ máy chủ CQT và tự động lưu về máy
+    // 4. Tải file Excel máy chủ CQT và tự động lưu về máy
     async function requestServerExcelBuffer(fromD, toD, isPurchase, loaiHD, companyCode, statusEl, monthTag, year) {
         const token = getJwtToken();
         const fromStr = fmtDateParam(fromD, false);
@@ -310,7 +324,6 @@
         const blob = await res.blob();
         const arrayBuffer = await blob.arrayBuffer();
 
-        // TỰ ĐỘNG TẢI FILE EXCEL CỦA CƠ QUAN THUẾ VỀ MÁY NGAY LẬP TỨC
         try {
             const dirStr = isPurchase ? 'Mua' : 'Ban';
             const fileNameParts = [companyCode, 'BK', dirStr, fileTypeTag, `T${monthTag}`, year].filter(Boolean).join(' ');
@@ -324,7 +337,7 @@
             a.remove();
             console.log(`[HDDT] Đã tải về file Excel gốc CQT: ${finalFileName}`);
         } catch (e) {
-            console.warn("Lỗi kích hoạt lưu file gốc:", e);
+            console.warn("Lỗi lưu file gốc:", e);
         }
 
         return arrayBuffer;
@@ -384,9 +397,13 @@
             }
 
             const ttText = String(row[colIdx.tt] || 'Hóa đơn mới').trim();
+            const ttLower = ttText.toLowerCase();
             let rowType = 'normal';
-            if (ttText.includes('điều chỉnh') || ttText.includes('thay thế')) {
-                rowType = (ttText.includes('đã bị') || ttText.includes('bị')) ? 'replaced_source' : 'modified';
+
+            if (ttLower.includes('đã bị') || ttLower.includes('bị điều chỉnh') || ttLower.includes('bị thay thế')) {
+                rowType = 'replaced_source';
+            } else if (ttLower.includes('điều chỉnh') || ttLower.includes('thay thế')) {
+                rowType = 'modified';
             }
 
             parsedList.push({
@@ -480,9 +497,9 @@
             const item = list[R - 4];
             let rowFill = null;
             if (item.rowType === 'modified') {
-                rowFill = { fgColor: { rgb: 'fef08a' } }; // Vàng: Điều chỉnh/thay thế
+                rowFill = { fgColor: { rgb: 'fef08a' } };
             } else if (item.rowType === 'replaced_source') {
-                rowFill = { fgColor: { rgb: 'fecaca' } }; // Đỏ nhạt: Bị điều chỉnh/bị thay thế
+                rowFill = { fgColor: { rgb: 'fecaca' } };
             }
 
             for (let C = 0; C < 15; C++) {
@@ -524,7 +541,7 @@
         ws['!cols'] = [
             { wch: 6 },  { wch: 8 },  { wch: 11 }, { wch: 10 }, { wch: 12 },
             { wch: 16 }, { wch: 35 }, { wch: 15 }, { wch: 14 }, { wch: 12 },
-            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 42 }, { wch: 18 }
+            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 45 }, { wch: 18 }
         ];
 
         const wb = XLSX.utils.book_new();
@@ -533,8 +550,7 @@
         XLSX.writeFile(wb, fileName);
     }
 
-    // 7. Workflow Điều phối & Ghi chú liên kết hai chiều giữa HĐ thay thế/điều chỉnh và HĐ gốc
-    // 7. Workflow Điều phối & Ghi chú liên kết hai chiều giữa HĐ thay thế/điều chỉnh và HĐ gốc
+    // 7. Workflow Điều phối & Ghi chú liên kết hai chiều theo API chuẩn CQT
     async function startBatchQueryWorkflow(monthsList, periodTag, year) {
         if (isFetching) {
             alert("Đang có tiến trình truy vấn, vui lòng đợi xong!");
@@ -555,11 +571,7 @@
 
         isFetching = true;
         currentPeriodInfo = { periodTag, year };
-        
-        // --- THÊM DÒNG NÀY ĐỂ KHAI BÁO companyCode ---
         const companyCode = (document.getElementById('api-company-code')?.value || 'Lkqt').trim();
-        // ----------------------------------------------
-        
         const autoExportCustom = document.getElementById('chk-auto-export-custom-excel')?.checked;
         const statusEl = document.getElementById('api-status');
 
@@ -580,8 +592,6 @@
                     const toD = new Date(year, m - 1, daysInMonth);
 
                     statusEl.textContent = `[${cat.label}] Lấy dữ liệu T${pad(m)}/${year}...`;
-                    
-                    // Lúc này companyCode đã tồn tại hợp lệ trong scope
                     const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, companyCode, statusEl, pad(m), year);
 
                     if (arrayBuffer) {
@@ -590,46 +600,76 @@
                     }
                     await new Promise(r => setTimeout(r, 400));
                 }
-               
+
                 store[catKey].sort((a, b) => (b.dateIso || '').localeCompare(a.dateIso || ''));
+               
+                // TÌM VÀ LIÊN KẾT HÓA ĐƠN QUA REST API: /invoices/relative
+                const needCheckList = store[catKey].filter(inv => inv.rowType === 'modified' || inv.rowType === 'replaced_source');
+                
+                if (needCheckList.length > 0) {
+                    statusEl.textContent = `[${cat.label}] Đang kết nối API Thuế tra cứu HĐ liên quan (${needCheckList.length} HĐ)...`;
+                    
+                    for (let x = 0; x < needCheckList.length; x++) {
+                        const item = needCheckList[x];
+                        statusEl.textContent = `[${cat.label}] Tra cứu HĐ ${item.shdon} (${x + 1}/${needCheckList.length})...`;
 
-                // Quét thông tin XML và liên kết ngược hai chiều với HĐ gốc
-                const needXmlList = store[catKey].filter(inv => inv.rowType === 'modified');
-                if (needXmlList.length > 0) {
-                    statusEl.textContent = `[${cat.label}] Đang quét XML liên quan (${needXmlList.length} HĐ)...`;
-                    for (let x = 0; x < needXmlList.length; x++) {
-                        const item = needXmlList[x];
-                        statusEl.textContent = `[${cat.label}] XML HĐ ${item.shdon} (${x + 1}/${needXmlList.length})...`;
-                        
-                        const refObj = await fetchRelatedInfoFromXml(item, isSco);
-                        if (refObj && refObj.fullDesc) {
-                            item.refText = refObj.fullDesc;
+                        const relInfo = await fetchInvoiceRelativeAndDetail(item, isSco);
+                        if (relInfo) {
+                            const currentNum = parseInt(item.shdon, 10);
+                            const shdMoiNum = relInfo.shdonMoi;
+                            const shdGocNum = relInfo.shdgoc;
+                            const partnerMst = normalizeCode(cat.isPurchase ? item.nbmst : item.nmmst);
+                            const ngayText = relInfo.ngayLapLQuan ? ` ngày ${relInfo.ngayLapLQuan}` : '';
 
-                            // Tìm hóa đơn gốc trong danh sách để ghi chú ngược
-                            if (refObj.shdGoc) {
-                                const targetCleanShd = parseInt(refObj.shdGoc, 10);
-                                const originalInv = store[catKey].find(cand => {
-                                    const candClean = parseInt(cand.shdon, 10);
-                                    const matchShd = (cand.shdon === refObj.shdGoc || candClean === targetCleanShd);
-                                    const matchKh = !refObj.khhdGoc || cand.khhdon.includes(refObj.khhdGoc);
-                                    const matchMst = (cat.isPurchase ? cand.nbmst === item.nbmst : cand.nmmst === item.nmmst);
-                                    return matchShd && matchKh && matchMst;
-                                });
+                            // Xác định hành động chuẩn: "điều chỉnh" hay "thay thế" dựa vào trạng thái HĐ
+                            const isAdjustment = item.statusText.toLowerCase().includes('điều chỉnh');
+                            const actionBi = isAdjustment ? 'Đã bị điều chỉnh' : 'Đã bị thay thế';
+                            const actionChuDong = isAdjustment ? 'Điều chỉnh cho HĐ số:' : 'Thay thế cho HĐ số:';
 
-                                if (originalInv) {
-                                    originalInv.rowType = 'replaced_source';
-                                    const noteBack = `Đã bị điều chỉnh/thay thế bởi HĐ: ${item.shdon} (${item.khhdon})`;
-                                    if (!originalInv.refText || originalInv.refText === '-') {
-                                        originalInv.refText = noteBack;
-                                    } else if (!originalInv.refText.includes(item.shdon)) {
-                                        originalInv.refText += `; ${noteBack}`;
+                            // 1. Nếu item hiện tại là HÓA ĐƠN BỊ ĐIỀU CHỈNH HOẶC BỊ THAY THẾ (HĐ gốc)
+                            if (currentNum === shdGocNum || item.rowType === 'replaced_source') {
+                                if (shdMoiNum) {
+                                    const khMoi = relInfo.khhdonMoi ? ` (${relInfo.khhdonMoi})` : '';
+                                    item.refText = `${actionBi} bởi HĐ: ${shdMoiNum}${khMoi}${ngayText}`;
+
+                                    // Gán chéo cho HĐ mới nếu cùng nằm trong bảng kê
+                                    const newInv = store[catKey].find(cand => {
+                                        const cMst = normalizeCode(cat.isPurchase ? cand.nbmst : cand.nmmst);
+                                        return (cMst === partnerMst) && (parseInt(cand.shdon, 10) === shdMoiNum);
+                                    });
+                                    if (newInv) {
+                                        newInv.rowType = 'modified';
+                                        const khGoc = (item.khmshdon || '') + (item.khhdon || '');
+                                        const itemNgay = item.ngayLap ? ` ngày ${item.ngayLap}` : '';
+                                        newInv.refText = `${actionChuDong} ${item.shdon} (${khGoc})${itemNgay}`;
+                                    }
+                                }
+                            }
+                            // 2. Nếu item hiện tại là HÓA ĐƠN ĐIỀU CHỈNH HOẶC THAY THẾ (HĐ mới)
+                            else if (currentNum === shdMoiNum || item.rowType === 'modified') {
+                                if (shdGocNum) {
+                                    const khGoc = relInfo.khhdgoc ? ` (${relInfo.khhdgoc})` : '';
+                                    item.refText = `${actionChuDong} ${shdGocNum}${khGoc}${ngayText}`;
+
+                                    // Gán chéo cho HĐ gốc nếu cùng nằm trong bảng kê
+                                    const oldInv = store[catKey].find(cand => {
+                                        const cMst = normalizeCode(cat.isPurchase ? cand.nbmst : cand.nmmst);
+                                        return (cMst === partnerMst) && (parseInt(cand.shdon, 10) === shdGocNum);
+                                    });
+                                    if (oldInv) {
+                                        oldInv.rowType = 'replaced_source';
+                                        const khHienTai = (item.khmshdon || '') + (item.khhdon || '');
+                                        const itemNgay = item.ngayLap ? ` ngày ${item.ngayLap}` : '';
+                                        oldInv.refText = `${actionBi} bởi HĐ: ${item.shdon} (${khHienTai})${itemNgay}`;
                                     }
                                 }
                             }
                         }
-                        await new Promise(r => setTimeout(r, 250));
+                        await new Promise(r => setTimeout(r, 150));
                     }
                 }
+                
+                
 
                 // Cập nhật badge số lượng
                 const badge = document.getElementById(`badge-tab-${catKey}`);
@@ -700,7 +740,7 @@
                 <td style="text-align: right; color: #64748b;">${fmtMoney(item.tgtphi)}</td>
                 <td style="text-align: right; font-weight: 600; color: #0f172a;">${fmtMoney(item.tgtttbso)}</td>
                 <td style="text-align: center;"><b>${item.statusText}</b></td>
-                <td style="font-size: 11px; max-width: 270px; white-space: normal; color: #0369a1; font-weight: 500;">${item.refText}</td>
+                <td style="font-size: 11px; max-width: 280px; white-space: normal; color: #0369a1; font-weight: 500;">${item.refText}</td>
                 <td style="text-align: center;">${item.ketQuaXuLy}</td>
             `;
             tbody.appendChild(tr);
@@ -923,5 +963,5 @@
         monthsContainer.appendChild(btn);
     }
 
-    console.log("%c[HDDT]%c Sẵn sàng với liên kết 2 chiều HĐ liên quan & Tự động xuất Excel!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
+    console.log("%c[HDDT]%c Đã chuyển sang REST API /relative & /detail thành công!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
 })();
