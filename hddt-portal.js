@@ -574,8 +574,8 @@
                     const toD = new Date(year, m - 1, daysInMonth);
 
                     statusEl.textContent = `[${cat.label}] Lấy dữ liệu T${pad(m)}/${year}...`;
-                    const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, statusEl, pad(m), year);
-
+                    const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, companyCode, statusEl, pad(m), year);
+                    
                     if (arrayBuffer) {
                         const parsed = parseExcelBuffer(arrayBuffer, cat.isPurchase, isSco);
                         store[catKey] = store[catKey].concat(parsed);
