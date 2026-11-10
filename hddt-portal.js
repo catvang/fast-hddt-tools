@@ -1,8 +1,6 @@
 (async function initFastHddtPortal() {
     'use strict';
-//javascript: document.head.appendChild(Object.assign(document.createElement('script'), {src: 'https://cdn.jsdelivr.net/gh/catvang/taiveBkhd@v1.91/tracuuHd.js'}));
-    // Thay thế thông tin Github của bạn ở đây:
-    // Định dạng: https://cdn.jsdelivr.net/gh/<USERNAME>/<REPO>@<BRANCH_OR_TAG>/
+
     const CDN_BASE = 'https://cdn.jsdelivr.net/gh/catvang/fast-hddt-tools@main/';
 
     // 0. Nạp dependencies, CSS và HTML template
@@ -30,16 +28,13 @@
         if (typeof XLSX === 'undefined') {
             await loadScript('https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js');
         }
-        // Nạp file CSS từ CDN
         loadCss(CDN_BASE + 'hddt-style.css');
 
-        // Nạp file HTML Template từ CDN và render vào DOM
         const htmlRes = await fetch(CDN_BASE + 'hddt-template.html');
         if (!htmlRes.ok) throw new Error("Không thể tải HTML Template từ CDN.");
         const htmlContent = await htmlRes.text();
 
-        // Xóa các node cũ nếu đã có
-        ['api-hddt-panel', 'api-hddt-modal', 'api-hddt-overlay'].forEach(id => {
+        ['api-hddt-panel', 'api-hddt-modal', 'api-hddt-overlay', 'api-hddt-root-container'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.remove();
         });
@@ -86,7 +81,6 @@
     let isFetching = false;
     let isBatchDownloading = false;
 
-    // Khởi tạo các Tab trên modal
     const tabContainer = document.getElementById('modal-tab-container');
     tabContainer.innerHTML = CATEGORIES.map((c, i) => `
         <button class="tab-btn ${i === 0 ? 'active' : ''}" data-key="${c.key}">
@@ -94,7 +88,6 @@
         </button>
     `).join('');
 
-    // Khởi tạo năm hiện tại
     const yearInput = document.getElementById('api-year');
     yearInput.value = new Date().getFullYear();
 
@@ -164,7 +157,7 @@
         });
     }
 
-    // 3. Xử lý XML & Đọc HĐ liên quan
+    // 3. Xử lý XML & Đọc cấu trúc HĐ liên quan
     async function extractXmlTextFromZip(zipBuffer) {
         const zip = await JSZip.loadAsync(zipBuffer);
         let xmlFile = zip.file("invoice.xml");
@@ -204,17 +197,24 @@
             const nodeLQuan = xmlDoc.querySelector("TTHDLQuan") || xmlDoc.querySelector("tthdlquan");
 
             if (nodeLQuan) {
-                const shdGoc = nodeLQuan.querySelector("SHDGoc, shdgoc")?.textContent || '';
-                const khhdGoc = nodeLQuan.querySelector("KHHDGoc, khhdgoc")?.textContent || '';
-                const nlapGoc = nodeLQuan.querySelector("NLapHDGoc, nlaphdgoc")?.textContent || '';
-                const gchu = nodeLQuan.querySelector("GChu, gchu")?.textContent || '';
+                const shdGoc = (nodeLQuan.querySelector("SHDGoc, shdgoc")?.textContent || '').trim();
+                const khhdGoc = (nodeLQuan.querySelector("KHHDGoc, khhdgoc")?.textContent || '').trim();
+                const nlapGoc = (nodeLQuan.querySelector("NLapHDGoc, nlaphdgoc")?.textContent || '').trim();
+                const gchu = (nodeLQuan.querySelector("GChu, gchu")?.textContent || '').trim();
 
-                let result = '';
-                if (shdGoc) result += `Số HĐ gốc: ${shdGoc}`;
-                if (khhdGoc) result += ` (${khhdGoc})`;
-                if (nlapGoc) result += ` ngày ${nlapGoc}`;
-                if (gchu) result += ` - ${gchu}`;
-                return result || null;
+                let desc = '';
+                if (shdGoc) desc += `Số HĐ gốc: ${shdGoc}`;
+                if (khhdGoc) desc += ` (${khhdGoc})`;
+                if (nlapGoc) desc += ` ngày ${nlapGoc}`;
+                if (gchu) desc += ` - ${gchu}`;
+
+                return {
+                    shdGoc: shdGoc,
+                    khhdGoc: khhdGoc,
+                    nlapGoc: nlapGoc,
+                    gchu: gchu,
+                    fullDesc: desc || null
+                };
             }
         } catch (e) {
             console.warn(`Không đọc được XML HĐ số ${item.shdon}:`, e);
@@ -253,8 +253,9 @@
         a.remove();
     }
 
-    // 4. API Tải Excel từ Cơ quan Thuế & Lưu ngay về máy
-    async function requestAndSaveServerExcel(fromD, toD, isPurchase, loaiHD, companyCode, monthTag, year, statusEl) {
+    // 4. Lấy Buffer Excel từ máy chủ CQT (chỉ lấy buffer để xử lý, không lưu file thô nếu chọn tải file tùy chỉnh)
+    // 4. Tải file Excel trực tiếp từ máy chủ CQT và tự động lưu về máy
+    async function requestServerExcelBuffer(fromD, toD, isPurchase, loaiHD, companyCode, statusEl, monthTag, year) {
         const token = getJwtToken();
         const fromStr = fmtDateParam(fromD, false);
         const toStr = fmtDateParam(toD, true);
@@ -271,7 +272,7 @@
             const captchaVal = await promptCaptcha(captchaData.content, `Nhập Captcha cho MTT ${isPurchase ? 'Mua vào' : 'Bán ra'} T${monthTag}/${year}`);
             if (!captchaVal) return null;
 
-            statusEl.textContent = `[T${monthTag}] Đang tải file Excel từ máy chủ CQT...`;
+            statusEl.textContent = `[T${monthTag}] Đang nạp dữ liệu từ máy chủ CQT...`;
             if (isPurchase) {
                 actionRaw = "Xuất hóa đơn có mã khởi tạo từ máy tính tiền mua vào";
                 url = `https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/export-excel-sold?sort=tdlap:desc&search=tdlap=ge=${fromStr};tdlap=le=${toStr};ttxly==8&ttxly==8&type=purchase&ckey=${encodeURIComponent(captchaData.key)}&cvalue=${encodeURIComponent(captchaVal)}`;
@@ -306,10 +307,10 @@
         });
 
         if (!res.ok) return null;
-
         const blob = await res.blob();
         const arrayBuffer = await blob.arrayBuffer();
 
+        // TỰ ĐỘNG TẢI FILE EXCEL CỦA CƠ QUAN THUẾ VỀ MÁY NGAY LẬP TỨC
         try {
             const dirStr = isPurchase ? 'Mua' : 'Ban';
             const fileNameParts = [companyCode, 'BK', dirStr, fileTypeTag, `T${monthTag}`, year].filter(Boolean).join(' ');
@@ -321,8 +322,9 @@
             document.body.appendChild(a);
             a.click();
             a.remove();
+            console.log(`[HDDT] Đã tải về file Excel gốc CQT: ${finalFileName}`);
         } catch (e) {
-            console.warn("Không tải tự động file được:", e);
+            console.warn("Lỗi kích hoạt lưu file gốc:", e);
         }
 
         return arrayBuffer;
@@ -413,16 +415,13 @@
         return parsedList;
     }
 
-    // 6. Xuất Excel Tab
+    // 6. Xuất File Excel Tùy Chỉnh Có Cột Hóa Đơn Liên Quan
     function exportTabToExcel(catKey) {
         const cat = CATEGORIES.find(c => c.key === catKey);
         const list = store[catKey] || [];
-        if (list.length === 0) {
-            alert("Bảng kê này hiện không có dữ liệu để xuất!");
-            return;
-        }
+        if (list.length === 0) return;
 
-        const companyCode = document.getElementById('api-company-code').value.trim() || 'Cty';
+        const companyCode = document.getElementById('api-company-code').value.trim() || 'Lkqt';
         const partnerHeaderTitle = cat.isPurchase ? 'Người bán' : 'Người mua';
 
         const wsData = [
@@ -480,8 +479,11 @@
         for (let R = 4; R < 4 + list.length; R++) {
             const item = list[R - 4];
             let rowFill = null;
-            if (item.rowType === 'modified') rowFill = { fgColor: { rgb: 'fef08a' } };
-            else if (item.rowType === 'replaced_source') rowFill = { fgColor: { rgb: 'fecaca' } };
+            if (item.rowType === 'modified') {
+                rowFill = { fgColor: { rgb: 'fef08a' } }; // Vàng: Điều chỉnh/thay thế
+            } else if (item.rowType === 'replaced_source') {
+                rowFill = { fgColor: { rgb: 'fecaca' } }; // Đỏ nhạt: Bị điều chỉnh/bị thay thế
+            }
 
             for (let C = 0; C < 15; C++) {
                 const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
@@ -522,7 +524,7 @@
         ws['!cols'] = [
             { wch: 6 },  { wch: 8 },  { wch: 11 }, { wch: 10 }, { wch: 12 },
             { wch: 16 }, { wch: 35 }, { wch: 15 }, { wch: 14 }, { wch: 12 },
-            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 38 }, { wch: 18 }
+            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 42 }, { wch: 18 }
         ];
 
         const wb = XLSX.utils.book_new();
@@ -531,7 +533,7 @@
         XLSX.writeFile(wb, fileName);
     }
 
-    // 7. Workflow điều phối
+    // 7. Workflow Điều phối & Ghi chú liên kết hai chiều giữa HĐ thay thế/điều chỉnh và HĐ gốc
     async function startBatchQueryWorkflow(monthsList, periodTag, year) {
         if (isFetching) {
             alert("Đang có tiến trình truy vấn, vui lòng đợi xong!");
@@ -552,7 +554,7 @@
 
         isFetching = true;
         currentPeriodInfo = { periodTag, year };
-        const companyCode = document.getElementById('api-company-code').value.trim() || 'Lkqt';
+        const autoExportCustom = document.getElementById('chk-auto-export-custom-excel').checked;
         const statusEl = document.getElementById('api-status');
 
         selectedKeys.forEach(k => { store[k] = []; });
@@ -571,8 +573,8 @@
                     const fromD = new Date(year, m - 1, 1);
                     const toD = new Date(year, m - 1, daysInMonth);
 
-                    statusEl.textContent = `[${cat.label}] Tải Excel server T${pad(m)}/${year}...`;
-                    const arrayBuffer = await requestAndSaveServerExcel(fromD, toD, cat.isPurchase, cat.loaiHD, companyCode, pad(m), year, statusEl);
+                    statusEl.textContent = `[${cat.label}] Lấy dữ liệu T${pad(m)}/${year}...`;
+                    const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, statusEl, pad(m), year);
 
                     if (arrayBuffer) {
                         const parsed = parseExcelBuffer(arrayBuffer, cat.isPurchase, isSco);
@@ -583,23 +585,57 @@
 
                 store[catKey].sort((a, b) => (b.dateIso || '').localeCompare(a.dateIso || ''));
 
+                // Quét thông tin XML và liên kết ngược hai chiều với HĐ gốc
                 const needXmlList = store[catKey].filter(inv => inv.rowType === 'modified');
                 if (needXmlList.length > 0) {
                     statusEl.textContent = `[${cat.label}] Đang quét XML liên quan (${needXmlList.length} HĐ)...`;
                     for (let x = 0; x < needXmlList.length; x++) {
                         const item = needXmlList[x];
                         statusEl.textContent = `[${cat.label}] XML HĐ ${item.shdon} (${x + 1}/${needXmlList.length})...`;
-                        const refInfo = await fetchRelatedInfoFromXml(item, isSco);
-                        if (refInfo) item.refText = refInfo;
+                        
+                        const refObj = await fetchRelatedInfoFromXml(item, isSco);
+                        if (refObj && refObj.fullDesc) {
+                            item.refText = refObj.fullDesc;
+
+                            // Tìm hóa đơn gốc trong danh sách để ghi chú ngược
+                            if (refObj.shdGoc) {
+                                const targetCleanShd = parseInt(refObj.shdGoc, 10);
+                                const originalInv = store[catKey].find(cand => {
+                                    const candClean = parseInt(cand.shdon, 10);
+                                    const matchShd = (cand.shdon === refObj.shdGoc || candClean === targetCleanShd);
+                                    const matchKh = !refObj.khhdGoc || cand.khhdon.includes(refObj.khhdGoc);
+                                    const matchMst = (cat.isPurchase ? cand.nbmst === item.nbmst : cand.nmmst === item.nmmst);
+                                    return matchShd && matchKh && matchMst;
+                                });
+
+                                if (originalInv) {
+                                    originalInv.rowType = 'replaced_source';
+                                    const noteBack = `Đã bị điều chỉnh/thay thế bởi HĐ: ${item.shdon} (${item.khhdon})`;
+                                    if (!originalInv.refText || originalInv.refText === '-') {
+                                        originalInv.refText = noteBack;
+                                    } else if (!originalInv.refText.includes(item.shdon)) {
+                                        originalInv.refText += `; ${noteBack}`;
+                                    }
+                                }
+                            }
+                        }
                         await new Promise(r => setTimeout(r, 250));
                     }
                 }
 
+                // Cập nhật badge số lượng
                 const badge = document.getElementById(`badge-tab-${catKey}`);
                 if (badge) badge.textContent = store[catKey].length;
+
+                // Tự động tải Excel tùy chỉnh nếu tùy chọn được bật
+                if (autoExportCustom && store[catKey].length > 0) {
+                    statusEl.textContent = `[${cat.label}] Đang lưu file Excel tùy chỉnh có HĐ liên quan...`;
+                    exportTabToExcel(catKey);
+                    await new Promise(r => setTimeout(r, 500));
+                }
             }
 
-            statusEl.textContent = `✔ Đã tải xong toàn bộ danh mục đã chọn!`;
+            statusEl.textContent = `✔ Đã tải và đối chiếu xong toàn bộ!`;
             statusEl.style.color = "#10b981";
 
             const firstActiveKey = selectedKeys.find(k => store[k].length > 0) || selectedKeys[0];
@@ -656,7 +692,7 @@
                 <td style="text-align: right; color: #64748b;">${fmtMoney(item.tgtphi)}</td>
                 <td style="text-align: right; font-weight: 600; color: #0f172a;">${fmtMoney(item.tgtttbso)}</td>
                 <td style="text-align: center;"><b>${item.statusText}</b></td>
-                <td style="font-size: 11px; max-width: 260px; white-space: normal; color: #0369a1; font-weight: 500;">${item.refText}</td>
+                <td style="font-size: 11px; max-width: 270px; white-space: normal; color: #0369a1; font-weight: 500;">${item.refText}</td>
                 <td style="text-align: center;">${item.ketQuaXuLy}</td>
             `;
             tbody.appendChild(tr);
@@ -731,7 +767,7 @@
         }
     }
 
-    // 9. Gắn sự kiện giao diện
+    // 9. Gắn sự kiện
     document.getElementById('modal-tab-container').addEventListener('click', (e) => {
         const btn = e.target.closest('.tab-btn');
         if (btn) switchTab(btn.getAttribute('data-key'));
@@ -879,5 +915,5 @@
         monthsContainer.appendChild(btn);
     }
 
-    console.log("%c[HDDT]%c Khởi tạo thành công từ CDN jsDelivr!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
+    console.log("%c[HDDT]%c Sẵn sàng với liên kết 2 chiều HĐ liên quan & Tự động xuất Excel!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
 })();
