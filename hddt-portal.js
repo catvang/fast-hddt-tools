@@ -534,6 +534,7 @@
     }
 
     // 7. Workflow Điều phối & Ghi chú liên kết hai chiều giữa HĐ thay thế/điều chỉnh và HĐ gốc
+    // 7. Workflow Điều phối & Ghi chú liên kết hai chiều giữa HĐ thay thế/điều chỉnh và HĐ gốc
     async function startBatchQueryWorkflow(monthsList, periodTag, year) {
         if (isFetching) {
             alert("Đang có tiến trình truy vấn, vui lòng đợi xong!");
@@ -554,7 +555,12 @@
 
         isFetching = true;
         currentPeriodInfo = { periodTag, year };
-        const autoExportCustom = document.getElementById('chk-auto-export-custom-excel').checked;
+        
+        // --- THÊM DÒNG NÀY ĐỂ KHAI BÁO companyCode ---
+        const companyCode = (document.getElementById('api-company-code')?.value || 'Lkqt').trim();
+        // ----------------------------------------------
+        
+        const autoExportCustom = document.getElementById('chk-auto-export-custom-excel')?.checked;
         const statusEl = document.getElementById('api-status');
 
         selectedKeys.forEach(k => { store[k] = []; });
@@ -574,15 +580,17 @@
                     const toD = new Date(year, m - 1, daysInMonth);
 
                     statusEl.textContent = `[${cat.label}] Lấy dữ liệu T${pad(m)}/${year}...`;
-                    const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, companyCode, statusEl, pad(m), year);
                     
+                    // Lúc này companyCode đã tồn tại hợp lệ trong scope
+                    const arrayBuffer = await requestServerExcelBuffer(fromD, toD, cat.isPurchase, cat.loaiHD, companyCode, statusEl, pad(m), year);
+
                     if (arrayBuffer) {
                         const parsed = parseExcelBuffer(arrayBuffer, cat.isPurchase, isSco);
                         store[catKey] = store[catKey].concat(parsed);
                     }
                     await new Promise(r => setTimeout(r, 400));
                 }
-
+               
                 store[catKey].sort((a, b) => (b.dateIso || '').localeCompare(a.dateIso || ''));
 
                 // Quét thông tin XML và liên kết ngược hai chiều với HĐ gốc
