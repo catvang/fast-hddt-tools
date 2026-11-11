@@ -68,6 +68,17 @@
     const fmtMoney = (val) => (val !== null && val !== undefined && val !== '') ? Number(val).toLocaleString('vi-VN') : '0';
     const normalizeCode = (s) => String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
 
+    function fmtIsoToDateStr(isoStr) {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
     const CATEGORIES = [
         { key: 'mv_cm', label: 'Mua vào - Có mã', isPurchase: true, loaiHD: 'co_ma', tag: 'Mua CMa' },
         { key: 'mv_km', label: 'Mua vào - Không mã', isPurchase: true, loaiHD: 'khong_ma', tag: 'Mua KMa' },
@@ -91,6 +102,12 @@
 
     const yearInput = document.getElementById('api-year');
     yearInput.value = new Date().getFullYear();
+
+    // Hàm đánh dấu nút kỳ đang được bật (Active)
+    function setActivePeriodButton(btnEl) {
+        document.querySelectorAll('.a-period-btn').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+    }
 
     // 2. Captcha Dialog
     async function fetchCaptcha() {
@@ -158,20 +175,7 @@
         });
     }
 
-    // 3. TẢI VÀ BÓC TÁCH QUA REST API: /invoices/relative VÀ /invoices/detail
-    // 3. TRA CỨU REST API: /invoices/relative VÀ /invoices/detail
-    // Chuyển đổi tdlap ISO string thành định dạng dd/mm/yyyy
-    function fmtIsoToDateStr(isoStr) {
-        if (!isoStr) return '';
-        try {
-            const d = new Date(isoStr);
-            if (isNaN(d.getTime())) return '';
-            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-        } catch (e) {
-            return '';
-        }
-    }
-
+    // 3. TRA CỨU REST API: /invoices/relative
     async function fetchInvoiceRelativeAndDetail(item, isSco) {
         const token = getJwtToken();
         const baseEndpoint = isSco ? 'sco-query' : 'query';
@@ -200,25 +204,19 @@
             const relData = Array.isArray(rawJson) ? rawJson[0] : rawJson;
             if (!relData) return null;
 
-            // Xử lý linh hoạt 2 chiều:
             let shdMoi = null;
             let khhdMoi = relData.khhdon || null;
             let shdGoc = null;
             let khhdGoc = relData.khhdgoc || null;
             const ngayLapLQuan = fmtIsoToDateStr(relData.tdlap);
 
-            // TH 1: Đứng ở HĐ gốc -> relData.shdgoc = 62422, relData.shdon = 62428
             if (relData.shdgoc && parseInt(relData.shdgoc, 10) === cleanShd) {
                 shdGoc = cleanShd;
                 shdMoi = parseInt(relData.shdon, 10);
-            } 
-            // TH 2: Đứng ở HĐ điều chỉnh -> relData.shdgoc = null, relData.shdon = 62422 (HĐ gốc)
-            else if (!relData.shdgoc && relData.shdon && parseInt(relData.shdon, 10) !== cleanShd) {
+            } else if (!relData.shdgoc && relData.shdon && parseInt(relData.shdon, 10) !== cleanShd) {
                 shdGoc = parseInt(relData.shdon, 10);
                 shdMoi = cleanShd;
-            }
-            // TH 3: Trường hợp còn lại
-            else {
+            } else {
                 shdMoi = relData.shdon ? parseInt(relData.shdon, 10) : null;
                 shdGoc = relData.shdgoc ? parseInt(relData.shdgoc, 10) : null;
             }
@@ -541,7 +539,7 @@
         ws['!cols'] = [
             { wch: 6 },  { wch: 8 },  { wch: 11 }, { wch: 10 }, { wch: 12 },
             { wch: 16 }, { wch: 35 }, { wch: 15 }, { wch: 14 }, { wch: 12 },
-            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 45 }, { wch: 18 }
+            { wch: 16 }, { wch: 8 },  { wch: 18 }, { wch: 48 }, { wch: 18 }
         ];
 
         const wb = XLSX.utils.book_new();
@@ -551,7 +549,7 @@
     }
 
     // 7. Workflow Điều phối & Ghi chú liên kết hai chiều theo API chuẩn CQT
-    async function startBatchQueryWorkflow(monthsList, periodTag, year) {
+    async function startBatchQueryWorkflow(monthsList, periodTag, year, triggerBtn) {
         if (isFetching) {
             alert("Đang có tiến trình truy vấn, vui lòng đợi xong!");
             return;
@@ -570,6 +568,7 @@
         }
 
         isFetching = true;
+        setActivePeriodButton(triggerBtn);
         currentPeriodInfo = { periodTag, year };
         const companyCode = (document.getElementById('api-company-code')?.value || 'Lkqt').trim();
         const autoExportCustom = document.getElementById('chk-auto-export-custom-excel')?.checked;
@@ -602,12 +601,12 @@
                 }
 
                 store[catKey].sort((a, b) => (b.dateIso || '').localeCompare(a.dateIso || ''));
-               
+
                 // TÌM VÀ LIÊN KẾT HÓA ĐƠN QUA REST API: /invoices/relative
                 const needCheckList = store[catKey].filter(inv => inv.rowType === 'modified' || inv.rowType === 'replaced_source');
                 
                 if (needCheckList.length > 0) {
-                    statusEl.textContent = `[${cat.label}] Đang kết nối API Thuế tra cứu HĐ liên quan (${needCheckList.length} HĐ)...`;
+                    statusEl.textContent = `[${cat.label}] Đang tra cứu HĐ liên quan (${needCheckList.length} HĐ)...`;
                     
                     for (let x = 0; x < needCheckList.length; x++) {
                         const item = needCheckList[x];
@@ -621,18 +620,16 @@
                             const partnerMst = normalizeCode(cat.isPurchase ? item.nbmst : item.nmmst);
                             const ngayText = relInfo.ngayLapLQuan ? ` ngày ${relInfo.ngayLapLQuan}` : '';
 
-                            // Xác định hành động chuẩn: "điều chỉnh" hay "thay thế" dựa vào trạng thái HĐ
                             const isAdjustment = item.statusText.toLowerCase().includes('điều chỉnh');
                             const actionBi = isAdjustment ? 'Đã bị điều chỉnh' : 'Đã bị thay thế';
                             const actionChuDong = isAdjustment ? 'Điều chỉnh cho HĐ số:' : 'Thay thế cho HĐ số:';
 
-                            // 1. Nếu item hiện tại là HÓA ĐƠN BỊ ĐIỀU CHỈNH HOẶC BỊ THAY THẾ (HĐ gốc)
+                            // 1. Nếu item là HĐ BỊ điều chỉnh/thay thế (gốc)
                             if (currentNum === shdGocNum || item.rowType === 'replaced_source') {
                                 if (shdMoiNum) {
                                     const khMoi = relInfo.khhdonMoi ? ` (${relInfo.khhdonMoi})` : '';
                                     item.refText = `${actionBi} bởi HĐ: ${shdMoiNum}${khMoi}${ngayText}`;
 
-                                    // Gán chéo cho HĐ mới nếu cùng nằm trong bảng kê
                                     const newInv = store[catKey].find(cand => {
                                         const cMst = normalizeCode(cat.isPurchase ? cand.nbmst : cand.nmmst);
                                         return (cMst === partnerMst) && (parseInt(cand.shdon, 10) === shdMoiNum);
@@ -645,13 +642,12 @@
                                     }
                                 }
                             }
-                            // 2. Nếu item hiện tại là HÓA ĐƠN ĐIỀU CHỈNH HOẶC THAY THẾ (HĐ mới)
+                            // 2. Nếu item là HĐ điều chỉnh/thay thế (mới)
                             else if (currentNum === shdMoiNum || item.rowType === 'modified') {
                                 if (shdGocNum) {
                                     const khGoc = relInfo.khhdgoc ? ` (${relInfo.khhdgoc})` : '';
                                     item.refText = `${actionChuDong} ${shdGocNum}${khGoc}${ngayText}`;
 
-                                    // Gán chéo cho HĐ gốc nếu cùng nằm trong bảng kê
                                     const oldInv = store[catKey].find(cand => {
                                         const cMst = normalizeCode(cat.isPurchase ? cand.nbmst : cand.nmmst);
                                         return (cMst === partnerMst) && (parseInt(cand.shdon, 10) === shdGocNum);
@@ -668,14 +664,10 @@
                         await new Promise(r => setTimeout(r, 150));
                     }
                 }
-                
-                
 
-                // Cập nhật badge số lượng
                 const badge = document.getElementById(`badge-tab-${catKey}`);
                 if (badge) badge.textContent = store[catKey].length;
 
-                // Tự động tải Excel tùy chỉnh nếu tùy chọn được bật
                 if (autoExportCustom && store[catKey].length > 0) {
                     statusEl.textContent = `[${cat.label}] Đang lưu file Excel tùy chỉnh có HĐ liên quan...`;
                     exportTabToExcel(catKey);
@@ -683,7 +675,7 @@
                 }
             }
 
-            statusEl.textContent = `✔ Đã tải và đối chiếu xong toàn bộ!`;
+            statusEl.textContent = `✔ Đã tải xong kỳ: ${periodTag}/${year}!`;
             statusEl.style.color = "#10b981";
 
             const firstActiveKey = selectedKeys.find(k => store[k].length > 0) || selectedKeys[0];
@@ -815,7 +807,26 @@
         }
     }
 
-    // 9. Gắn sự kiện
+    // 9. Gắn sự kiện giao diện
+    // Thu gọn / Mở rộng Panel
+    const panelEl = document.getElementById('api-hddt-panel');
+    const btnToggle = document.getElementById('btn-toggle-panel');
+    const headerBar = document.getElementById('api-panel-header');
+
+    function togglePanel() {
+        const isCollapsed = panelEl.classList.toggle('collapsed');
+        btnToggle.textContent = isCollapsed ? '+' : '−';
+        btnToggle.title = isCollapsed ? 'Mở rộng panel' : 'Thu gọn panel';
+    }
+
+    btnToggle.onclick = (e) => {
+        e.stopPropagation();
+        togglePanel();
+    };
+    headerBar.onclick = () => {
+        if (panelEl.classList.contains('collapsed')) togglePanel();
+    };
+
     document.getElementById('modal-tab-container').addEventListener('click', (e) => {
         const btn = e.target.closest('.tab-btn');
         if (btn) switchTab(btn.getAttribute('data-key'));
@@ -942,26 +953,35 @@
     document.getElementById('api-prev-y').onclick = () => yearInput.value = parseInt(yearInput.value, 10) - 1;
     document.getElementById('api-next-y').onclick = () => yearInput.value = parseInt(yearInput.value, 10) + 1;
 
+    // Sự kiện nút Quý
     document.querySelectorAll('.a-btn-q').forEach(btn => {
         btn.onclick = () => {
             const q = parseInt(btn.getAttribute('data-q'), 10);
             const y = parseInt(yearInput.value, 10);
             const quarterMap = { 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] };
-            startBatchQueryWorkflow(quarterMap[q], `Q${q}`, y);
+            startBatchQueryWorkflow(quarterMap[q], `Q${q}`, y, btn);
         };
     });
 
+    // Tạo danh sách nút Tháng
     const monthsContainer = document.getElementById('api-months');
     for (let m = 1; m <= 12; m++) {
         const btn = document.createElement('button');
-        btn.className = 'a-btn-m';
+        btn.className = 'a-btn-m a-period-btn';
         btn.textContent = `T${pad(m)}`;
         btn.onclick = () => {
             const y = parseInt(yearInput.value, 10);
-            startBatchQueryWorkflow([m], `T${pad(m)}`, y);
+            startBatchQueryWorkflow([m], `T${pad(m)}`, y, btn);
         };
         monthsContainer.appendChild(btn);
     }
 
-    console.log("%c[HDDT]%c Đã chuyển sang REST API /relative & /detail thành công!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
+    // Sự kiện nút Cả Năm
+    document.getElementById('btn-query-all-year').onclick = function () {
+        const y = parseInt(yearInput.value, 10);
+        const allMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        startBatchQueryWorkflow(allMonths, `Nam_${y}`, y, this);
+    };
+
+    console.log("%c[HDDT]%c Đã cập nhật nút Cả năm, Active nút kỳ & Nút thu gọn panel!", "color:#0284c7;font-weight:bold;", "color:#16a34a;");
 })();
