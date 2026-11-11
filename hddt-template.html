@@ -1,58 +1,71 @@
 <div id="api-hddt-panel">
-    <div style="font-weight: 700; color: #0f172a; margin-bottom: 8px;">Tra Cứu & Tải Nhanh Hóa Đơn Điện Tử</div>
+    <!-- Header có nút thu gọn/mở rộng -->
+    <div class="panel-header-bar" id="api-panel-header">
+        <span style="font-weight: 700; color: #0f172a;">Tra Cứu Hóa Đơn Điện Tử</span>
+        <button type="button" class="btn-toggle-panel" id="btn-toggle-panel" title="Thu gọn / Mở rộng panel">−</button>
+    </div>
     
-    <div class="cb-container">
-        <div class="cb-header">
-            <span>Chọn loại HĐ cần tải</span>
-            <label style="cursor:pointer; font-weight:normal; font-size:11.5px; color:#0284c7;">
-                <input type="checkbox" id="cb-check-all-types" checked> Tất cả
+    <!-- Phần thân Panel -->
+    <div id="api-hddt-panel-body" style="margin-top: 8px;">
+        <div class="cb-container">
+            <div class="cb-header">
+                <span>Chọn loại HĐ cần tải</span>
+                <label style="cursor:pointer; font-weight:normal; font-size:11.5px; color:#0284c7;">
+                    <input type="checkbox" id="cb-check-all-types" checked> Tất cả
+                </label>
+            </div>
+            <div class="cb-columns">
+                <div class="cb-col">
+                    <div class="cb-col-title">▼ Mua vào</div>
+                    <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_cm" checked> Có mã</label>
+                    <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_km" checked> Không mã</label>
+                    <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_mtt" checked> Máy tính tiền</label>
+                </div>
+                <div class="cb-col" style="border-left: 1px solid #e2e8f0; padding-left: 10px;">
+                    <div class="cb-col-title">▼ Bán ra</div>
+                    <label class="cb-item"><input type="checkbox" class="cb-type-item" value="br_cm" checked> Có mã</label>
+                    <label class="cb-item"><input type="checkbox" class="cb-type-item" value="br_mtt" checked> Máy tính tiền</label>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 5px 8px; margin-bottom: 7px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; cursor: pointer; color: #166534; font-weight: 600;">
+                <input type="checkbox" id="chk-auto-export-custom-excel" checked style="cursor: pointer;">
+                Tự động tải Excel có HĐ liên quan
             </label>
         </div>
-        <div class="cb-columns">
-            <div class="cb-col">
-                <div class="cb-col-title">▼ Mua vào</div>
-                <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_cm" checked> Có mã</label>
-                <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_km" checked> Không mã</label>
-                <label class="cb-item"><input type="checkbox" class="cb-type-item" value="mv_mtt" checked> Máy tính tiền</label>
-            </div>
-            <div class="cb-col" style="border-left: 1px solid #e2e8f0; padding-left: 10px;">
-                <div class="cb-col-title">▼ Bán ra</div>
-                <label class="cb-item"><input type="checkbox" class="cb-type-item" value="br_cm" checked> Có mã</label>
-                <label class="cb-item"><input type="checkbox" class="cb-type-item" value="br_mtt" checked> Máy tính tiền</label>
+
+        <div class="a-row" style="justify-content: space-between;">
+            <span style="font-weight: 600;">Mã công ty:</span>
+            <input type="text" id="api-company-code" class="a-input-code" value="Lkqt" placeholder="Mã Cty...">
+        </div>
+        <div class="a-row" style="justify-content: space-between;">
+            <span style="font-weight: 600;">Năm kê khai:</span>
+            <div style="display:flex; gap:4px; align-items:center;">
+                <button id="api-prev-y" style="width:24px; cursor:pointer;">-</button>
+                <input id="api-year" type="number" value="2026" style="width: 60px; text-align: center; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <button id="api-next-y" style="width:24px; cursor:pointer;">+</button>
             </div>
         </div>
-    </div>
 
-    <!-- Tùy chọn tải bảng kê Excel tùy chỉnh có HĐ liên quan -->
-    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px;">
-        <label style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; cursor: pointer; color: #166534; font-weight: 600;">
-            <input type="checkbox" id="chk-auto-export-custom-excel" checked style="cursor: pointer;">
-            Tự động tải Excel có HĐ liên quan
-        </label>
-    </div>
-
-    <div class="a-row" style="justify-content: space-between;">
-        <span style="font-weight: 600;">Mã công ty:</span>
-        <input type="text" id="api-company-code" class="a-input-code" value="Lkqt" placeholder="Mã Cty...">
-    </div>
-    <div class="a-row" style="justify-content: space-between;">
-        <span style="font-weight: 600;">Năm kê khai:</span>
-        <div style="display:flex; gap:4px; align-items:center;">
-            <button id="api-prev-y" style="width:24px;">-</button>
-            <input id="api-year" type="number" value="2026" style="width: 60px; text-align: center; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 4px;">
-            <button id="api-next-y" style="width:24px;">+</button>
+        <!-- Tra cứu theo kỳ -->
+        <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 4px;">Tra cứu theo quý:</div>
+        <div class="a-grid-q">
+            <button class="a-btn-q a-period-btn" data-q="1">Quý 1</button>
+            <button class="a-btn-q a-period-btn" data-q="2">Quý 2</button>
+            <button class="a-btn-q a-period-btn" data-q="3">Quý 3</button>
+            <button class="a-btn-q a-period-btn" data-q="4">Quý 4</button>
         </div>
+
+        <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 6px;">Tra cứu theo tháng:</div>
+        <div class="a-grid-m" id="api-months"></div>
+
+        <!-- Nút Tra Cứu Cả Năm -->
+        <button type="button" class="a-btn-all-year a-period-btn" id="btn-query-all-year">📅 Tra cứu Cả Năm</button>
+
+        <div id="api-status" style="font-size: 11px; color: #64748b; text-align: center; min-height: 14px; margin-top: 6px;">Sẵn sàng</div>
     </div>
-    <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 4px;">Tra cứu theo quý:</div>
-    <div class="a-grid-q">
-        <button class="a-btn-q" data-q="1">Quý 1</button>
-        <button class="a-btn-q" data-q="2">Quý 2</button>
-        <button class="a-btn-q" data-q="3">Quý 3</button>
-        <button class="a-btn-q" data-q="4">Quý 4</button>
-    </div>
-    <div style="font-size: 11px; font-weight: 600; color: #475569; margin-top: 8px;">Tra cứu theo tháng:</div>
-    <div class="a-grid-m" id="api-months"></div>
-    <div id="api-status" style="font-size: 11px; color: #64748b; text-align: center; min-height: 14px; margin-top: 4px;">Sẵn sàng</div>
 </div>
 
 <div id="api-hddt-overlay"></div>
