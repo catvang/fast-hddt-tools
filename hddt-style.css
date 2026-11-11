@@ -8,12 +8,55 @@
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.25);
     border: 1px solid #cbd5e1;
-    padding: 14px 16px;
+    padding: 12px 14px;
     z-index: 999998;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 13px;
     user-select: none;
+    transition: all 0.25s ease;
 }
+
+/* Header Panel & nút thu gọn */
+.panel-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 13px;
+}
+.btn-toggle-panel {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+}
+.btn-toggle-panel:hover {
+    background: #0284c7;
+    color: #fff;
+    border-color: #0284c7;
+}
+
+/* Trạng thái thu gọn */
+#api-hddt-panel.collapsed #api-hddt-panel-body {
+    display: none !important;
+}
+#api-hddt-panel.collapsed {
+    padding: 8px 12px;
+    width: 240px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
 .a-row {
     display: flex;
     gap: 6px;
@@ -28,11 +71,13 @@
     font-weight: bold;
     color: #0284c7;
 }
+
+/* Nút chọn kỳ (Quý, Tháng, Cả năm) */
 .a-grid-q {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
-    margin-top: 6px;
+    margin-top: 5px;
 }
 .a-btn-q {
     padding: 5px 0;
@@ -43,16 +88,22 @@
     font-weight: 700;
     cursor: pointer;
     font-size: 12px;
+    transition: all 0.15s;
 }
 .a-btn-q:hover {
-    background: #0284c7;
-    color: #fff;
+    background: #e0f2fe;
 }
+.a-btn-q.active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #0369a1 !important;
+}
+
 .a-grid-m {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 3px;
-    margin: 6px 0 8px 0;
+    margin: 5px 0 6px 0;
 }
 .a-btn-m {
     padding: 5px 0;
@@ -62,11 +113,38 @@
     font-weight: 600;
     cursor: pointer;
     font-size: 11px;
+    transition: all 0.15s;
 }
 .a-btn-m:hover {
-    background: #0284c7;
-    color: #fff;
-    border-color: #0284c7;
+    background: #f1f5f9;
+}
+.a-btn-m.active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #0369a1 !important;
+}
+
+/* Nút Cả Năm */
+.a-btn-all-year {
+    width: 100%;
+    padding: 6px 0;
+    margin-top: 5px;
+    border: 1px solid #6ee7b7;
+    background: #ecfdf5;
+    color: #047857;
+    border-radius: 5px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+.a-btn-all-year:hover {
+    background: #d1fae5;
+}
+.a-btn-all-year.active {
+    background: #047857 !important;
+    color: #ffffff !important;
+    border-color: #065f46 !important;
 }
 
 /* Khung Checkbox 2 cột */
@@ -74,8 +152,8 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 6px;
-    padding: 8px 10px;
-    margin-bottom: 8px;
+    padding: 7px 9px;
+    margin-bottom: 7px;
 }
 .cb-header {
     display: flex;
@@ -83,10 +161,10 @@
     align-items: center;
     font-weight: 700;
     color: #1e293b;
-    font-size: 12px;
+    font-size: 11.5px;
     border-bottom: 1px solid #e2e8f0;
     padding-bottom: 4px;
-    margin-bottom: 6px;
+    margin-bottom: 5px;
 }
 .cb-columns {
     display: flex;
@@ -96,10 +174,10 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
 }
 .cb-col-title {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
     color: #0369a1;
     text-transform: uppercase;
@@ -118,7 +196,7 @@
     margin: 0;
 }
 
-/* Modal cố định kích thước khi đổi Tab */
+/* Modal & Table styling */
 #api-hddt-modal {
     display: none;
     position: fixed;
@@ -172,10 +250,7 @@
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
 }
-.tab-btn:hover {
-    background: #e2e8f0;
-    color: #0f172a;
-}
+.tab-btn:hover { background: #e2e8f0; color: #0f172a; }
 .tab-btn.active {
     background: #ffffff;
     color: #0284c7;
@@ -193,10 +268,7 @@
     border-radius: 10px;
     margin-left: 4px;
 }
-.tab-btn.active .tab-badge {
-    background: #0284c7;
-    color: #ffffff;
-}
+.tab-btn.active .tab-badge { background: #0284c7; color: #ffffff; }
 
 .modal-filter-bar {
     display: flex;
@@ -212,11 +284,7 @@
     flex-wrap: wrap;
     flex-shrink: 0;
 }
-.modal-filter-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
+.modal-filter-group { display: flex; align-items: center; gap: 6px; }
 .input-mst-filter {
     width: 120px;
     padding: 4px 8px;
@@ -244,17 +312,8 @@
     border: 1px solid #e2e8f0;
     border-radius: 6px;
 }
-.modal-tbl {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    white-space: nowrap;
-}
-.modal-tbl th, .modal-tbl td {
-    border-bottom: 1px solid #e2e8f0;
-    padding: 6px 8px;
-    text-align: left;
-}
+.modal-tbl { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.modal-tbl th, .modal-tbl td { border-bottom: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
 .modal-tbl th {
     background: #f8fafc;
     position: sticky;
@@ -278,8 +337,6 @@
     font-weight: 600;
 }
 .btn-download-xml:hover { background: #0369a1; }
-.btn-download-xml:disabled { opacity: 0.6; cursor: not-allowed; }
-
 .btn-top-download {
     background: #0284c7;
     color: #fff;
